@@ -14,7 +14,8 @@
         <div class="row">
             <div class="col-12">
                 <div class="oh-input__group">
-                    <label class="oh-input__label" for="{{individual_form.employee_id.id_for_label}}">{% trans "Employee" %}</label>
+                    <label class="oh-input__label" for="{{individual_form.employee_id.id_for_label}}">
+                        Employee</label>
                     {{individual_form.employee_id}} {{individual_form.employee_id.errors}}
                 </div>
             </div>
@@ -25,16 +26,11 @@
             </div>
         </div>
         <div class="row">
-            <div class="col-12 col-sm-12 col-md-6 col-lg-6">
+            <div class="col-12">
                 <div class="oh-input__group">
-                    <label class="oh-input__label" for="{{individual_form.start_date.id_for_label}}">{% trans "Start Date" %}</label>
-                    {{individual_form.start_date}} {{individual_form.start_date.errors}}
-                </div>
-            </div>
-            <div class="col-12 col-sm-12 col-md-6 col-lg-6">
-                <div class="oh-input__group">
-                    <label class="oh-input__label" for="{{individual_form.end_date.id_for_label}}">{% trans "End Date" %}</label>
-                    {{individual_form.end_date}} {{individual_form.end_date.errors }}
+                    <label class="oh-input__label" for="{{individual_form.month.id_for_label}}">Month
+                    </label>
+                    {{individual_form.month}} {{individual_form.month.errors}}
                 </div>
             </div>
         </div>

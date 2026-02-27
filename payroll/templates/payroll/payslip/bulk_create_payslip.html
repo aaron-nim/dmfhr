@@ -27,16 +27,10 @@
             </div>
         </div>
         <div class="row">
-            <div class="col-12 col-sm-12 col-md-6 col-lg-6">
+            <div class="col-12">
                 <div class="oh-input__group">
-                    <label class="oh-input__label" for="{{bulk_form.start_date.id_for_label}}">{% trans "Start Date" %}</label>
-                    {{bulk_form.start_date}} {{bulk_form.start_date.errors}}
-                </div>
-            </div>
-            <div class="col-12 col-sm-12 col-md-6 col-lg-6">
-                <div class="oh-input__group">
-                    <label class="oh-input__label" for="{{bulk_form.end_date.id_for_label}}">{% trans "End Date" %}</label>
-                    {{bulk_form.end_date}} {{bulk_form.end_date.errors }}
+                    <label class="oh-input__label" for="{{bulk_form.month.id_for_label}}">{% trans "Select Month" %}</label>
+                    {{bulk_form.month}} {{bulk_form.month.errors}}
                 </div>
             </div>
         </div>

@@ -54,8 +54,9 @@ def generate_payslip(date, companies, all):
     # Remove duplicates if an employee has multiple active contracts
     active_employees = active_employees.distinct()
     # find the date range
-    start_date = date - relativedelta(months=1)
-    end_date = date - timedelta(days=1)
+    start_date = date.replace(day=1)
+    next_month = date.replace(day=28) + timedelta(days=4)
+    end_date = next_month - timedelta(days=next_month.day)
     # Payslip creation
     for employee in active_employees:
         payslip = Payslip.objects.filter(
@@ -68,8 +69,7 @@ def generate_payslip(date, companies, all):
         ).first()
         if end_date < contract.contract_start_date:
             continue
-        if start_date < contract.contract_start_date:
-            start_date = contract.contract_start_date
+        # Full month pay — no proration for new hires
         payslip_data = payroll_calculation(employee, start_date, end_date)
         payslip_data["payslip"] = payslip
         data = {}

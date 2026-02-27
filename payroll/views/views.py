@@ -616,6 +616,7 @@ def view_payslip_pdf(request, payslip_id):
             data["host"] = request.get_host()
             data["protocol"] = "https" if request.is_secure() else "http"
             data["company"] = company
+            data["payment_date"] = date(start_date.year, start_date.month, 15)
 
             return render(request, "payroll/payslip/payslip_pdf.html", context=data)
         return redirect(filter_payslip)
@@ -641,6 +642,8 @@ def view_created_payslip(request, payslip_id, **kwargs):
         data["json_data"]["employee"] = payslip.employee_id.id
         data["json_data"]["payslip"] = payslip.id
         data["instance"] = payslip
+        # Payment date is always the 15th of the payslip month
+        data["payment_date"] = date(payslip.start_date.year, payslip.start_date.month, 15)
         return render(request, "payroll/payslip/individual_payslip.html", data)
     return render(request, "404.html")
 
@@ -1553,6 +1556,7 @@ def payslip_pdf(request, id):
                     "host": request.get_host(),
                     "protocol": "https" if request.is_secure() else "http",
                     "company": company,
+                    "payment_date": date(start_date.year, start_date.month, 15),
                 }
             )
 

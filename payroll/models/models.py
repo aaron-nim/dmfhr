@@ -1381,6 +1381,9 @@ class Payslip(HorillaModel):
     def clean(self):
         super().clean()
         today = date.today()
+        # Guard against None values (dates may be set by the view after form validation)
+        if self.start_date is None or self.end_date is None:
+            return
         if self.end_date < self.start_date:
             raise ValidationError(
                 {

@@ -371,8 +371,7 @@ class PayslipForm(ModelForm):
             }
         )
         if self.instance.pk is None:
-            self.initial["start_date"] = datetime.date.today().replace(day=1)
-            self.initial["end_date"] = datetime.date.today()
+            self.initial["month"] = datetime.date.today().strftime("%Y-%m")
 
     class Meta:
         """
@@ -382,26 +381,53 @@ class PayslipForm(ModelForm):
         model = payroll.models.models.Payslip
         fields = [
             "employee_id",
-            "start_date",
-            "end_date",
         ]
-        exclude = ["is_active"]
+        exclude = ["is_active", "start_date", "end_date"]
         widgets = {
-            "start_date": forms.DateInput(
+            "month": forms.TextInput(
                 attrs={
-                    "type": "date",
+                    "type": "month",
                     "hx-get": "/payroll/check-contract-start-date",
                     "hx-target": "#contractStartDateDiv",
                     "hx-include": "#payslipCreateForm",
                     "hx-trigger": "change delay:300ms",
                 }
             ),
-            "end_date": forms.DateInput(
-                attrs={
-                    "type": "date",
-                }
-            ),
         }
+
+    month = forms.CharField(
+        label="Select Month",
+        widget=forms.TextInput(attrs={"type": "month", "class": "oh-input w-100"}),
+        required=True,
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        month_str = cleaned_data.get("month")
+
+        if month_str:
+            try:
+                # Parse YYYY-MM
+                year, month = map(int, month_str.split("-"))
+
+                # Calculate Range
+                start_date = datetime.date(year, month, 1)
+
+                # Get last day
+                if month == 12:
+                    end_date = datetime.date(year, 12, 31)
+                else:
+                    end_date = datetime.date(year, month + 1, 1) - datetime.timedelta(
+                        days=1
+                    )
+
+                # Inject into cleaned_data for the View
+                cleaned_data["start_date"] = start_date
+                cleaned_data["end_date"] = end_date
+            except Exception as e:
+                raise forms.ValidationError({"month": "Invalid month format."})
+
+        return cleaned_data
 
 
 class GeneratePayslipForm(HorillaForm):
@@ -425,30 +451,38 @@ class GeneratePayslipForm(HorillaForm):
         label="Employee",
         required=True,
     )
-    start_date = forms.DateField(widget=forms.DateInput(attrs={"type": "date"}))
-    end_date = forms.DateField(widget=forms.DateInput(attrs={"type": "date"}))
+    month = forms.CharField(
+        label="Select Month",
+        widget=forms.TextInput(attrs={"type": "month", "class": "oh-input w-100"}),
+        required=True,
+    )
 
     def clean(self):
         cleaned_data = super().clean()
-        start_date = cleaned_data.get("start_date")
-        end_date = cleaned_data.get("end_date")
+        month_str = cleaned_data.get("month")
 
-        today = datetime.date.today()
-        if end_date < start_date:
-            raise forms.ValidationError(
-                {
-                    "end_date": "The end date must be greater than or equal to the start date."
-                }
-            )
-        if start_date > today:
-            raise forms.ValidationError(
-                {"end_date": "The start date cannot be in the future."}
-            )
+        if month_str:
+            try:
+                # Parse YYYY-MM
+                year, month = map(int, month_str.split("-"))
 
-        if end_date > today:
-            raise forms.ValidationError(
-                {"end_date": "The end date cannot be in the future."}
-            )
+                # Calculate Range
+                start_date = datetime.date(year, month, 1)
+
+                # Get last day
+                if month == 12:
+                    end_date = datetime.date(year, 12, 31)
+                else:
+                    end_date = datetime.date(year, month + 1, 1) - datetime.timedelta(
+                        days=1
+                    )
+
+                # Inject into cleaned_data for the View
+                cleaned_data["start_date"] = start_date
+                cleaned_data["end_date"] = end_date
+            except Exception as e:
+                raise forms.ValidationError({"month": "Invalid month format."})
+
         return cleaned_data
 
     def __init__(self, *args, **kwargs):
@@ -461,11 +495,9 @@ class GeneratePayslipForm(HorillaForm):
         self.fields["employee_id"].widget.attrs.update(
             {"class": "oh-select oh-select-2", "id": uuid.uuid4()}
         )
-        self.fields["start_date"].widget.attrs.update({"class": "oh-input w-100"})
+        self.fields["month"].widget.attrs.update({"class": "oh-input w-100"})
         self.fields["group_name"].widget.attrs.update({"class": "oh-input w-100"})
-        self.fields["end_date"].widget.attrs.update({"class": "oh-input w-100"})
-        self.initial["start_date"] = datetime.date.today().replace(day=1)
-        self.initial["end_date"] = datetime.date.today()
+        self.initial["month"] = datetime.date.today().strftime("%Y-%m")
 
     class Meta:
         """
@@ -473,8 +505,7 @@ class GeneratePayslipForm(HorillaForm):
         """
 
         widgets = {
-            "start_date": forms.DateInput(attrs={"type": "date"}),
-            "end_date": forms.DateInput(attrs={"type": "date"}),
+            "month": forms.TextInput(attrs={"type": "month"}),
         }
 
 

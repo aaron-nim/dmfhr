@@ -9,6 +9,7 @@ import operator
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 from itertools import groupby
+from dateutil.relativedelta import relativedelta
 from urllib.parse import parse_qs
 
 import pandas as pd
@@ -107,16 +108,20 @@ def payroll_calculation(employee, start_date, end_date):
     """
     Calculate payroll components for the specified employee within the given date range.
 
+    Company Rule: Full salary is always paid on the 15th of each month,
+    regardless of contract start date. No proration for new hires.
 
     Args:
         employee (Employee): The employee for whom the payroll is calculated.
-        start_date (date): The start date of the payroll period.
-        end_date (date): The end date of the payroll period.
-
+        start_date (date): The start date of the payroll period (1st of month).
+        end_date (date): The end date of the payroll period (last day of month).
 
     Returns:
-        dict: A dictionary containing the calculated payroll components:
+        dict: A dictionary containing the calculated payroll components.
     """
+
+    # Always use full month range (no proration)
+    # start_date and end_date come from the form's month picker (1st to last day)
 
     basic_pay_details = compute_salary_on_period(employee, start_date, end_date)
     contract = basic_pay_details["contract"]
@@ -135,10 +140,8 @@ def payroll_calculation(employee, start_date, end_date):
     basic_pay_deductions = updated_basic_pay_data["deductions"]
 
     loss_of_pay_amount = 0
-    if not contract.deduct_leave_from_basic_pay:
+    if contract and contract.deduct_leave_from_basic_pay:
         loss_of_pay_amount = loss_of_pay
-    else:
-        basic_pay = basic_pay - loss_of_pay_amount
 
     kwargs = {
         "employee": employee,
@@ -147,7 +150,6 @@ def payroll_calculation(employee, start_date, end_date):
         "basic_pay": basic_pay,
         "day_dict": working_days_details,
     }
-    # basic pay will be basic_pay = basic_pay - update_compensation_amount
     allowances = calculate_allowance(**kwargs)
 
     # finding the total allowance
@@ -187,13 +189,10 @@ def payroll_calculation(employee, start_date, end_date):
         + total_post_tax_deduction
         + total_tax_deductions
         + federal_tax
-        + loss_of_pay  # 1022
+        + federal_tax
     )
 
     net_pay = gross_pay - total_deductions
-    # loss_of_pay        -> actual lop amount
-    # loss_of_pay_amount -> actual lop if deduct from basic-
-    #                       pay from contract is enabled
     net_pay = compute_net_pay(
         net_pay=net_pay,
         gross_pay=gross_pay,
@@ -238,6 +237,7 @@ def payroll_calculation(employee, start_date, end_date):
         "total_deductions": total_deductions,
         "loss_of_pay": loss_of_pay,
         "federal_tax": federal_tax,
+
         "start_date": start_date,
         "end_date": end_date,
         "range": f"{start_date.strftime('%b %d %Y')} - {end_date.strftime('%b %d %Y')}",
@@ -755,11 +755,7 @@ def generate_payslip(request):
 
             group_name = form.cleaned_data["group_name"]
             for employee in employees:
-                contract = Contract.objects.filter(
-                    employee_id=employee, contract_status="active"
-                ).first()
-                if start_date < contract.contract_start_date:
-                    start_date = contract.contract_start_date
+                # Full month pay — no proration for new hires
                 payslip = payroll_calculation(employee, start_date, end_date)
                 payslips.append(payslip)
                 json_data.append(payslip["json_data"])
@@ -861,23 +857,7 @@ def create_payslip(request, new_post_data=None):
     form = forms.PayslipForm()
 
     if request.method == "POST":
-        employee_id = request.POST.get("employee_id")
-        start_date = (
-            datetime.strptime(request.POST.get("start_date"), "%Y-%m-%d").date()
-            if isinstance(request.POST.get("start_date"), str)
-            else request.POST.get("start_date")
-        )
-
-        if employee_id and start_date:
-            contract = Contract.objects.filter(
-                employee_id=employee_id, contract_status="active"
-            ).first()
-
-            if contract and start_date < contract.contract_start_date:
-                new_post_data = request.POST.copy()
-                new_post_data["start_date"] = contract.contract_start_date
-                request.POST = new_post_data
-        form = forms.PayslipForm(request.POST)
+        form = forms.PayslipForm(request.POST) 
         if form.is_valid():
             employee = form.cleaned_data["employee_id"]
             start_date = form.cleaned_data["start_date"]
@@ -990,6 +970,8 @@ def view_individual_payslip(request, employee_id, start_date, end_date):
     """
 
     payslip_data = payroll_calculation(employee_id, start_date, end_date)
+    # Payment date is always the 15th of the payslip month
+    payslip_data["payment_date"] = date(start_date.year, start_date.month, 15)
     return render(
         request,
         "payroll/payslip/individual_payslip.html",
