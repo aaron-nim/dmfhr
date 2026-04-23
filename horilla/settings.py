@@ -245,3 +245,9 @@ if not DEBUG:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+EMAIL_USE_TLS = True
+EMAIL_HOST ="authsmtp.securemail.pro"
+EMAIL_PORT =587
+EMAIL_HOST_USER ="donotreply@dmfiam.ch"
+EMAIL_HOST_PASSWORD ="MyDMF2025"
