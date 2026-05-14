@@ -45,12 +45,18 @@ class TicketSendThread(Thread):
         link = "#"
         email_backend = ConfiguredEmailBackend()
 
-        display_email_name = email_backend.dynamic_from_email_with_display_name
+        sender_address = email_backend.dynamic_mail_sent_from
+        from_header = sender_address
+        reply_to_address = sender_address
         if self.request:
             try:
-                display_email_name = f"{self.request.user.employee_get.get_full_name()} <{self.request.user.employee_get.email}>"
-            except:
-                logger.error(Exception)
+                user_name = self.request.user.employee_get.get_full_name()
+                user_email = self.request.user.employee_get.email
+                if sender_address:
+                    from_header = f"{user_name} <{sender_address}>"
+                reply_to_address = f"{user_name} <{user_email}>"
+            except Exception as exc:
+                logger.exception("Could not resolve request user for mail headers: %s", exc)
 
         if ticket_id != "#":
             link = f"{protocol}://{host}/helpdesk/ticket-detail/{ticket_id}/"
@@ -71,9 +77,9 @@ class TicketSendThread(Thread):
             email = EmailMessage(
                 subject=subject,
                 body=html_message,
-                from_email=display_email_name,
+                from_email=from_header,
                 to=[recipient.email],
-                reply_to=[display_email_name],
+                reply_to=[reply_to_address],
             )
             email.content_subtype = "html"
             try:
@@ -152,12 +158,18 @@ class AddAssigneeThread(Thread):
         host = self.host
         protocol = self.protocol
         email_backend = ConfiguredEmailBackend()
-        display_email_name = email_backend.dynamic_from_email_with_display_name
+        sender_address = email_backend.dynamic_mail_sent_from
+        from_header = sender_address
+        reply_to_address = sender_address
         if self.request:
             try:
-                display_email_name = f"{self.request.user.employee_get.get_full_name()} <{self.request.user.employee_get.email}>"
-            except:
-                pass
+                user_name = self.request.user.employee_get.get_full_name()
+                user_email = self.request.user.employee_get.email
+                if sender_address:
+                    from_header = f"{user_name} <{sender_address}>"
+                reply_to_address = f"{user_name} <{user_email}>"
+            except Exception as exc:
+                logger.exception("Could not resolve request user for mail headers: %s", exc)
         link = f"{protocol}://{host}/helpdesk/ticket-detail/{self.ticket.id}/"
         for recipient in self.recipients:
             html_message = render_to_string(
@@ -176,9 +188,9 @@ class AddAssigneeThread(Thread):
             email = EmailMessage(
                 subject=subject,
                 body=html_message,
-                from_email=display_email_name,
+                from_email=from_header,
                 to=[recipient.email],
-                reply_to=[display_email_name],
+                reply_to=[reply_to_address],
             )
             email.content_subtype = "html"
             try:
@@ -209,12 +221,18 @@ class RemoveAssigneeThread(Thread):
         subject = "You have been removed from a Ticket"
         email_backend = ConfiguredEmailBackend()
 
-        display_email_name = email_backend.dynamic_from_email_with_display_name
+        sender_address = email_backend.dynamic_mail_sent_from
+        from_header = sender_address
+        reply_to_address = sender_address
         if self.request:
             try:
-                display_email_name = f"{self.request.user.employee_get.get_full_name()} <{self.request.user.employee_get.email}>"
-            except:
-                pass
+                user_name = self.request.user.employee_get.get_full_name()
+                user_email = self.request.user.employee_get.email
+                if sender_address:
+                    from_header = f"{user_name} <{sender_address}>"
+                reply_to_address = f"{user_name} <{user_email}>"
+            except Exception as exc:
+                logger.exception("Could not resolve request user for mail headers: %s", exc)
         host = self.host
         protocol = self.protocol
         link = f"{protocol}://{host}/helpdesk/ticket-detail/{self.ticket.id}/"
@@ -235,9 +253,9 @@ class RemoveAssigneeThread(Thread):
             email = EmailMessage(
                 subject=subject,
                 body=html_message,
-                from_email=display_email_name,
+                from_email=from_header,
                 to=[recipient.email],
-                reply_to=[display_email_name],
+                reply_to=[reply_to_address],
             )
             email.content_subtype = "html"
             try:

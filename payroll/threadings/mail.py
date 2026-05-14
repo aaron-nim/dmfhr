@@ -55,19 +55,28 @@ class MailSendThread(Thread):
                 )
             employee = record["instances"][0].employee_id
             email_backend = ConfiguredEmailBackend()
-            display_email_name = email_backend.dynamic_from_email_with_display_name
+            # Keep From: aligned with the SMTP-authenticated sender so relays
+            # that enforce sender alignment (e.g. securemail.pro) don't drop us.
+            # Only the display name and Reply-To carry the acting user's identity.
+            sender_address = email_backend.dynamic_mail_sent_from
+            from_header = sender_address
+            reply_to_address = sender_address
             if self.request:
                 try:
-                    display_email_name = f"{self.request.user.employee_get.get_full_name()} <{self.request.user.employee_get.email}>"
-                except:
-                    logger.error(Exception)
+                    user_name = self.request.user.employee_get.get_full_name()
+                    user_email = self.request.user.employee_get.email
+                    if sender_address:
+                        from_header = f"{user_name} <{sender_address}>"
+                    reply_to_address = f"{user_name} <{user_email}>"
+                except Exception as exc:
+                    logger.exception("Could not resolve request user for mail headers: %s", exc)
 
             email = EmailMessage(
                 f"Hello, {record['instances'][0].get_name()} Your Payslips is Ready!",
                 html_message,
-                display_email_name,
+                from_header,
                 [employee.get_mail()],
-                reply_to=[display_email_name],
+                reply_to=[reply_to_address],
             )
             email.attachments = attachments
 

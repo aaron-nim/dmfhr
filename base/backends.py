@@ -83,7 +83,10 @@ class DefaultHorillaMailBackend(EmailBackend):
                     configuration.use_dynamic_display_name
                     and request.user.is_authenticated
                 ):
-                    display_email_name = f"{request.user.employee_get.get_full_name()} <{request.user.employee_get.get_email()}>"
+                    # Swap only the display NAME to the acting user; the address
+                    # must stay as the SMTP-authenticated sender so relays that
+                    # enforce sender alignment don't drop the message.
+                    display_email_name = f"{request.user.employee_get.get_full_name()} <{configuration.from_email}>"
                 if request.user.is_authenticated:
                     user_id = request.user.pk
                     reply_to = [
