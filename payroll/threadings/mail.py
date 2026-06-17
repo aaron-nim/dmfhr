@@ -44,15 +44,37 @@ class MailSendThread(Thread):
                 request=self.request,
             )
             attachments = []
+            attached_ids = []
             for instance in record["instances"]:
                 response = payslip_pdf(self.request, instance.id)
+                content = getattr(response, "content", b"") or b""
+                status = getattr(response, "status_code", 200)
+                # Only attach a genuine PDF. generate_payslip_pdf() returns an
+                # error HttpResponse (text, status 500) when wkhtmltopdf fails;
+                # attaching that produced unreadable "payslip.pdf" files.
+                if status != 200 or not content.startswith(b"%PDF-"):
+                    logger.error(
+                        "Skipping payslip %s: PDF generation failed (status=%s, %d bytes)",
+                        instance.id,
+                        status,
+                        len(content),
+                    )
+                    continue
                 attachments.append(
                     (
                         f"{instance.get_payslip_title()}.pdf",
-                        response.content,
+                        content,
                         "application/pdf",
                     )
                 )
+                attached_ids.append(instance.id)
+
+            if not attachments:
+                logger.error(
+                    "No valid payslip PDFs generated for %s; email not sent.",
+                    record["instances"][0].employee_id,
+                )
+                continue
             employee = record["instances"][0].employee_id
             email_backend = ConfiguredEmailBackend()
             # Keep From: aligned with the SMTP-authenticated sender so relays
@@ -84,7 +106,9 @@ class MailSendThread(Thread):
             email.content_subtype = "html"
             try:
                 email.send()
-                Payslip.objects.filter(id__in=self.ids).update(sent_to_employee=True)
+                Payslip.objects.filter(id__in=attached_ids).update(
+                    sent_to_employee=True
+                )
             except Exception as e:
                 logger.exception(e)
 
