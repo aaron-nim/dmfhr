@@ -5,13 +5,14 @@ This module is used to define the method for the path in the urls
 """
 
 import json
+import logging
+import subprocess
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 from itertools import groupby
 from urllib.parse import parse_qs
 
 import pandas as pd
-import pdfkit
 from django.contrib import messages
 from django.db.models import ProtectedError, Q
 from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
@@ -1438,6 +1439,9 @@ def equalize_lists_length(allowances, deductions):
     return deductions, allowances
 
 
+logger = logging.getLogger(__name__)
+
+
 def generate_payslip_pdf(template_path, context, html=False):
     """
     Generate a PDF file from an HTML template and context data.
@@ -1450,38 +1454,63 @@ def generate_payslip_pdf(template_path, context, html=False):
     Returns:
         HttpResponse: A response with the generated PDF file or raw HTML.
     """
+    # Render the HTML content from the template and context
+    html_content = render_to_string(template_path, context)
+
+    # Return raw HTML if requested
+    if html:
+        return HttpResponse(html_content, content_type="text/html")
+
+    # wkhtmltopdf arguments. "load-error-handling=ignore" lets a missing logo,
+    # web font, or unreachable CDN asset degrade gracefully instead of aborting
+    # the whole document. wkhtmltopdf still exits non-zero for those non-fatal
+    # errors while emitting a valid PDF, so we accept the result whenever it
+    # actually produced PDF bytes -- previously pdfkit discarded the good PDF on
+    # any non-zero exit and the error text was emailed as an unreadable
+    # "payslip.pdf".
+    args = [
+        "wkhtmltopdf",
+        "--quiet",
+        "--enable-local-file-access",
+        "--load-error-handling", "ignore",
+        "--load-media-error-handling", "ignore",
+        "--page-size", "A4",
+        "--margin-top", "10mm",
+        "--margin-bottom", "10mm",
+        "--margin-left", "10mm",
+        "--margin-right", "10mm",
+        "--encoding", "UTF-8",
+        "--dpi", "300",
+        "--zoom", "1.3",
+        "--footer-center", "[page]/[topage]",
+        "-",
+        "-",
+    ]
     try:
-        # Render the HTML content from the template and context
-        html_content = render_to_string(template_path, context)
-
-        # Return raw HTML if requested
-        if html:
-            return HttpResponse(html_content, content_type="text/html")
-
-        # PDF options for pdfkit
-        pdf_options = {
-            "page-size": "A4",
-            "margin-top": "10mm",
-            "margin-bottom": "10mm",
-            "margin-left": "10mm",
-            "margin-right": "10mm",
-            "encoding": "UTF-8",
-            "enable-local-file-access": None,  # Required to load local CSS/images
-            "dpi": 300,
-            "zoom": 1.3,
-            "footer-center": "[page]/[topage]",  # Required to load local CSS/images
-        }
-
-        # Generate the PDF as binary content
-        pdf = pdfkit.from_string(html_content, False, options=pdf_options)
-
-        # Return an HttpResponse containing the PDF content
-        response = HttpResponse(pdf, content_type="application/pdf")
-        response["Content-Disposition"] = "inline; filename=payslip.pdf"
-        return response
+        result = subprocess.run(
+            args,
+            input=html_content.encode("utf-8"),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=120,
+        )
     except Exception as e:
-        # Handle errors gracefully
+        logger.exception("wkhtmltopdf invocation failed: %s", e)
         return HttpResponse(f"Error generating PDF: {str(e)}", status=500)
+
+    pdf = result.stdout
+    if not pdf.startswith(b"%PDF-"):
+        logger.error(
+            "wkhtmltopdf produced no PDF (exit %s): %s",
+            result.returncode,
+            result.stderr.decode("utf-8", "replace")[:500],
+        )
+        return HttpResponse("Error generating PDF", status=500)
+
+    # Return an HttpResponse containing the PDF content
+    response = HttpResponse(pdf, content_type="application/pdf")
+    response["Content-Disposition"] = "inline; filename=payslip.pdf"
+    return response
 
 
 def payslip_pdf(request, id):
