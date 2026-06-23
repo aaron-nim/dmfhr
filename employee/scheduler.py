@@ -25,6 +25,15 @@ def block_unblock_disciplinary():
     from base.models import EmployeeShiftSchedule
     from employee.models import DisciplinaryAction
     from employee.policies import employee_account_block_unblock
+    from horilla_audit.models import AccountBlockUnblock
+
+    # Respect the global "Account block/unblock" setting. When the feature is
+    # disabled (or was never enabled) this job must not toggle any user's
+    # is_active; otherwise reactivating a blocked account never sticks because
+    # this task runs every 25 seconds and keeps re-applying the block.
+    setting = AccountBlockUnblock.objects.first()
+    if not (setting and setting.is_enabled):
+        return
 
     dis_action = DisciplinaryAction.objects.all()
     for dis in dis_action:
@@ -134,7 +143,7 @@ def block_unblock_disciplinary():
 
 if not any(
     cmd in sys.argv
-    for cmd in ["makemigrations", "migrate", "compilemessages", "flush", "shell"]
+    for cmd in ["makemigrations", "migrate", "compilemessages", "flush", "shell", "test"]
 ):
     """
     Initializes and starts background tasks using APScheduler when the server is running.

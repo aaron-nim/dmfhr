@@ -1,10 +1,14 @@
+import datetime
 import json
 
+from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 
-from employee.models import Employee
+from employee.models import Actiontype, DisciplinaryAction, Employee
+from employee.scheduler import block_unblock_disciplinary
 from horilla.horilla_middlewares import _thread_locals
+from horilla_audit.models import AccountBlockUnblock
 
 
 class ArchiveSyncsUserActiveTestCase(TestCase):
@@ -98,3 +102,55 @@ class ArchiveSyncsUserActiveTestCase(TestCase):
         self._refresh()
         self.assertTrue(self.employee.is_active)
         self.assertTrue(self.user.is_active)
+
+
+class DisciplinaryBlockRespectsToggleTestCase(TestCase):
+    """The disciplinary-action scheduler must honour the global
+    ``AccountBlockUnblock`` switch.
+
+    A blocking disciplinary action (dismissal/suspension) re-applies
+    ``User.is_active = False`` every 25s. When the global feature is off, the
+    scheduler must not touch the account, otherwise a reactivated user is
+    re-blocked within seconds.
+    """
+
+    def setUp(self):
+        _thread_locals.request = None
+        self.employee = Employee.objects.create(
+            employee_first_name="Disc",
+            email="disc@example.com",
+            phone="1112223333",
+        )
+        self.user = self.employee.employee_user_id
+        # A dismissal action type that blocks login, effective in the past.
+        action = Actiontype.objects.create(
+            title="Dismissal", action_type="dismissal", block_option=True
+        )
+        disc = DisciplinaryAction.objects.create(
+            action=action,
+            description="test",
+            start_date=datetime.date(2020, 1, 1),
+        )
+        disc.employee_id.add(self.employee)
+
+    def tearDown(self):
+        _thread_locals.request = None
+
+    def test_does_not_block_when_feature_disabled(self):
+        # No AccountBlockUnblock row => feature off => account left alone.
+        self.assertFalse(AccountBlockUnblock.objects.exists())
+        block_unblock_disciplinary()
+        self.user.refresh_from_db()
+        self.assertTrue(
+            self.user.is_active,
+            "scheduler must not block while the global feature is disabled",
+        )
+
+    def test_blocks_when_feature_enabled(self):
+        AccountBlockUnblock.objects.create(is_enabled=True)
+        block_unblock_disciplinary()
+        self.user.refresh_from_db()
+        self.assertFalse(
+            self.user.is_active,
+            "scheduler should block when the global feature is enabled",
+        )
