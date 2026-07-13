@@ -1618,24 +1618,31 @@ def onboarding_send_mail(request, candidate_id):
         request, "onboarding/send_mail_form.html", {"candidate": candidate}
     )
     email_backend = ConfiguredEmailBackend()
-    display_email_name = email_backend.dynamic_from_email_with_display_name
+    sender_address = email_backend.dynamic_mail_sent_from
+    from_header = sender_address
+    reply_to_address = sender_address
     if request:
         try:
-            display_email_name = f"{request.user.employee_get.get_full_name()} <{request.user.employee_get.email}>"
-        except:
-            logger.error(Exception)
+            user_name = request.user.employee_get.get_full_name()
+            user_email = request.user.employee_get.email
+            if sender_address:
+                from_header = f"{user_name} <{sender_address}>"
+            reply_to_address = f"{user_name} <{user_email}>"
+        except Exception as exc:
+            logger.exception("Could not resolve request user for mail headers: %s", exc)
 
     if request.method == "POST":
         subject = request.POST["subject"]
         body = request.POST["body"]
         with contextlib.suppress(Exception):
-            res = send_mail(
-                subject,
-                body,
-                display_email_name,
-                [candidate_mail],
-                fail_silently=False,
+            msg = EmailMessage(
+                subject=subject,
+                body=body,
+                from_email=from_header,
+                to=[candidate_mail],
+                reply_to=[reply_to_address],
             )
+            res = msg.send(fail_silently=False)
             if res == 1:
                 messages.success(request, _("Mail sent successfully"))
             else:

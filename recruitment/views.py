@@ -18,7 +18,7 @@ import logging
 from django.contrib import messages
 from django.contrib.auth.models import Permission
 from django.core import serializers
-from django.core.mail import send_mail
+from django.core.mail import EmailMessage, send_mail
 from django.core.paginator import Paginator
 from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import redirect, render
@@ -1264,16 +1264,27 @@ def send_acknowledgement(request):
         subject = request.POST.get("subject")
         bdy = request.POST.get("body")
         email_backend = ConfiguredEmailBackend()
-        display_email_name = email_backend.dynamic_from_email_with_display_name
+        sender_address = email_backend.dynamic_mail_sent_from
+        from_header = sender_address
+        reply_to_address = sender_address
         if request:
             try:
-                display_email_name = f"{request.user.employee_get.get_full_name()} <{request.user.employee_get.email}>"
-            except:
-                logger.error(Exception)
+                user_name = request.user.employee_get.get_full_name()
+                user_email = request.user.employee_get.email
+                if sender_address:
+                    from_header = f"{user_name} <{sender_address}>"
+                reply_to_address = f"{user_name} <{user_email}>"
+            except Exception as exc:
+                logger.exception("Could not resolve request user for mail headers: %s", exc)
 
-        res = send_mail(
-            subject, bdy, display_email_name, [send_to], fail_silently=False
+        msg = EmailMessage(
+            subject=subject,
+            body=bdy,
+            from_email=from_header,
+            to=[send_to],
+            reply_to=[reply_to_address],
         )
+        res = msg.send(fail_silently=False)
         if res == 1:
             return HttpResponse(
                 """

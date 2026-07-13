@@ -2069,6 +2069,9 @@ def employee_bulk_archive(request):
         employee.employee_user_id.is_active = is_active
         if employee.get_archive_condition() is False:
             employee.save()
+            # Employee.save() does not cascade to the linked user, so persist
+            # its active state explicitly.
+            employee.employee_user_id.save(update_fields=["is_active"])
             message = _("archived")
             if is_active:
                 message = _("un-archived")
@@ -2089,7 +2092,10 @@ def employee_archive(request, obj_id):
     """
     employee = Employee.objects.get(id=obj_id)
     employee.is_active = not employee.is_active
-    employee.employee_user_id.is_active = not employee.is_active
+    # Keep the linked login user's active state in sync with the employee
+    # (previously this read the already-flipped value, setting the user to the
+    # opposite of the employee).
+    employee.employee_user_id.is_active = employee.is_active
     save = True
     message = "Employee un-archived"
     if not employee.is_active:
@@ -2112,6 +2118,10 @@ def employee_archive(request, obj_id):
             message = _("Employee archived")
     if save:
         employee.save()
+        # Employee.save() does not cascade to the linked user, so persist its
+        # active state explicitly; otherwise archiving never blocks login and
+        # un-archiving never restores it.
+        employee.employee_user_id.save(update_fields=["is_active"])
         messages.success(request, message)
         key = "HTTP_HX_REQUEST"
         if key not in request.META.keys():
@@ -2240,7 +2250,9 @@ def get_manager_in(request):
     else:
         title = _("Can't Archive")
     employee.is_active = not employee.is_active
-    employee.employee_user_id.is_active = not employee.is_active
+    # Keep the linked login user's active state in sync with the employee
+    # (previously this read the already-flipped value).
+    employee.employee_user_id.is_active = employee.is_active
     save = True
     message = "Employee un-archived"
     if not employee.is_active:
@@ -2251,6 +2263,9 @@ def get_manager_in(request):
             message = _("Employee archived")
     if save:
         employee.save()
+        # Employee.save() does not cascade to the linked user, so persist its
+        # active state explicitly.
+        employee.employee_user_id.save(update_fields=["is_active"])
         messages.success(request, message)
         key = "HTTP_HX_REQUEST"
         if key not in request.META.keys():
