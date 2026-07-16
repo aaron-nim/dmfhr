@@ -2,6 +2,8 @@
 App configuration for the 'payroll' app.
 """
 
+import logging
+
 from django.apps import AppConfig
 from django.db.models.signals import post_migrate
 
@@ -27,12 +29,18 @@ class PayrollConfig(AppConfig):
             path("payroll/", include("payroll.urls.urls")),
         )
         try:
-            from payroll.scheduler import auto_payslip_generate
+            from horilla.scheduler_utils import schedulers_enabled
 
-            auto_payslip_generate()
-        except:
-            """
-            Migrations are not affected
-            """
+            if schedulers_enabled():
+                from payroll.scheduler import auto_payslip_generate
+
+                auto_payslip_generate()
+        except Exception:
+            # Migrations must not be affected, but a skipped startup payslip
+            # catch-up in the scheduler service (e.g. DB not up yet) has to
+            # be visible in journalctl rather than silently swallowed.
+            logging.getLogger(__name__).exception(
+                "payroll startup auto_payslip_generate skipped"
+            )
 
         return ready

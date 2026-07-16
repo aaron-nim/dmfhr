@@ -37,6 +37,7 @@ from horilla.decorators import (
 )
 from horilla.filters import HorillaPaginator
 from horilla.horilla_settings import BIO_DEVICE_THREADS
+from horilla.scheduler_utils import close_db_connections, schedulers_enabled
 from horilla.settings import TIME_ZONE
 
 from .anviz import CrossChexCloudAPI
@@ -2264,6 +2265,7 @@ def zk_biometric_attendance_logs(device_or_devices):
     return len(combined_attendances), "; ".join(errors) if errors else None
 
 
+@close_db_connections
 def zk_biometric_attendance_scheduler(device_id):
     """
     Scheduler function used for attendance logs
@@ -2378,6 +2380,7 @@ def anviz_biometric_attendance_logs(device):
     return processed_count
 
 
+@close_db_connections
 def anviz_biometric_attendance_scheduler(device_id):
     """
     Schedules the attendance log retrieval for an Anviz biometric device.
@@ -2453,6 +2456,7 @@ def cosec_biometric_attendance_logs(device):
     return len(attendances)
 
 
+@close_db_connections
 def cosec_biometric_attendance_scheduler(device_id):
     """
     Retrieve and process attendance events from a COSEC biometric device.
@@ -2541,6 +2545,7 @@ def dahua_biometric_attendance_logs(device):
         return "error"
 
 
+@close_db_connections
 def dahua_biometric_attendance_scheduler(device_id):
     """
     Schedules the attendance log retrieval for a Dahua biometric device.
@@ -2620,6 +2625,7 @@ def etimeoffice_biometric_attendance_logs(device):
     return len(punch_data)
 
 
+@close_db_connections
 def etimeoffice_biometric_attendance_scheduler(device_id):
     """
     Schedules the attendance log retrieval for an eTimeOffice biometric device.
@@ -2629,55 +2635,61 @@ def etimeoffice_biometric_attendance_scheduler(device_id):
         etimeoffice_biometric_attendance_logs(device)
 
 
-try:
-    devices = BiometricDevices.objects.all().update(is_live=False)
-    for device in BiometricDevices.objects.filter(is_scheduler=True):
-        if device:
-            if str_time_seconds(device.scheduler_duration) > 0:
-                if device.machine_type == "anviz":
-                    scheduler = BackgroundScheduler()
-                    scheduler.add_job(
-                        lambda: anviz_biometric_attendance_scheduler(device.id),
-                        "interval",
-                        seconds=str_time_seconds(device.scheduler_duration),
-                    )
-                    scheduler.start()
-                elif device.machine_type == "zk":
-                    scheduler = BackgroundScheduler()
-                    scheduler.add_job(
-                        lambda: zk_biometric_attendance_scheduler(device.id),
-                        "interval",
-                        seconds=str_time_seconds(device.scheduler_duration),
-                        id=f"biometric_{device.id}",
-                    )
-                    scheduler.start()
-                elif device.machine_type == "dahua":
-                    scheduler = BackgroundScheduler()
-                    scheduler.add_job(
-                        lambda: dahua_biometric_attendance_scheduler(device.id),
-                        "interval",
-                        seconds=str_time_seconds(device.scheduler_duration),
-                    )
-                    scheduler.start()
+# Device pollers belong to web workers only (today's behavior); the dedicated
+# scheduler service imports this module too (apps.ready -> include(urls)) and
+# must not add a competing poller per device.
+if not schedulers_enabled():
+    try:
+        devices = BiometricDevices.objects.all().update(is_live=False)
+        for device in BiometricDevices.objects.filter(is_scheduler=True):
+            if device:
+                if str_time_seconds(device.scheduler_duration) > 0:
+                    if device.machine_type == "anviz":
+                        scheduler = BackgroundScheduler()
+                        scheduler.add_job(
+                            lambda: anviz_biometric_attendance_scheduler(device.id),
+                            "interval",
+                            seconds=str_time_seconds(device.scheduler_duration),
+                        )
+                        scheduler.start()
+                    elif device.machine_type == "zk":
+                        scheduler = BackgroundScheduler()
+                        scheduler.add_job(
+                            lambda: zk_biometric_attendance_scheduler(device.id),
+                            "interval",
+                            seconds=str_time_seconds(device.scheduler_duration),
+                            id=f"biometric_{device.id}",
+                        )
+                        scheduler.start()
+                    elif device.machine_type == "dahua":
+                        scheduler = BackgroundScheduler()
+                        scheduler.add_job(
+                            lambda: dahua_biometric_attendance_scheduler(device.id),
+                            "interval",
+                            seconds=str_time_seconds(device.scheduler_duration),
+                        )
+                        scheduler.start()
 
-                elif device.machine_type == "cosec":
-                    scheduler = BackgroundScheduler()
-                    scheduler.add_job(
-                        lambda: cosec_biometric_attendance_scheduler(device.id),
-                        "interval",
-                        seconds=str_time_seconds(device.scheduler_duration),
-                    )
-                    scheduler.start()
+                    elif device.machine_type == "cosec":
+                        scheduler = BackgroundScheduler()
+                        scheduler.add_job(
+                            lambda: cosec_biometric_attendance_scheduler(device.id),
+                            "interval",
+                            seconds=str_time_seconds(device.scheduler_duration),
+                        )
+                        scheduler.start()
 
-                elif device.machine_type == "etimeoffice":
-                    scheduler = BackgroundScheduler()
-                    scheduler.add_job(
-                        lambda: etimeoffice_biometric_attendance_scheduler(device.id),
-                        "interval",
-                        seconds=str_time_seconds(device.scheduler_duration),
-                    )
-                    scheduler.start()
-                else:
-                    pass
-except:
-    pass
+                    elif device.machine_type == "etimeoffice":
+                        scheduler = BackgroundScheduler()
+                        scheduler.add_job(
+                            lambda: etimeoffice_biometric_attendance_scheduler(
+                                device.id
+                            ),
+                            "interval",
+                            seconds=str_time_seconds(device.scheduler_duration),
+                        )
+                        scheduler.start()
+                    else:
+                        pass
+    except:
+        pass

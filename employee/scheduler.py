@@ -1,10 +1,12 @@
 import datetime
-import sys
 from datetime import timedelta
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
+from horilla.scheduler_utils import close_db_connections, schedulers_enabled
 
+
+@close_db_connections
 def update_experience():
     from employee.models import EmployeeWorkInformation
 
@@ -18,6 +20,7 @@ def update_experience():
     return
 
 
+@close_db_connections
 def block_unblock_disciplinary():
     """
     This scheduled task to trigger the Disciplinary action and take the suspens
@@ -141,10 +144,7 @@ def block_unblock_disciplinary():
     return
 
 
-if not any(
-    cmd in sys.argv
-    for cmd in ["makemigrations", "migrate", "compilemessages", "flush", "shell", "test"]
-):
+if schedulers_enabled():
     """
     Initializes and starts background tasks using APScheduler when the server is running.
     """

@@ -1,0 +1,39 @@
+# Horilla background-job scheduler — systemd unit template.
+#
+# Since the scheduler-connection fix, gunicorn web workers start ZERO
+# background schedulers (they used to start 7 each, pinning DB connections
+# and triple-firing every job). ALL background jobs (leave reset, contract
+# expiry, work records, auto payslips, shift rotation, notifications) run
+# ONLY in this service. If this unit is not installed and active, background
+# jobs silently stop — `systemctl is-active horilla-scheduler` is a MANDATORY
+# post-deploy check.
+#
+# Install (fill in the three <placeholders> for the host):
+#   sudo cp docs/deploy/horilla-scheduler.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now horilla-scheduler
+#
+# <app_user>   the unix account the app runs as
+# <app_dir>    the checkout containing manage.py
+# <python>     the interpreter that has the app's requirements
+#              (virtualenv python if the host uses one, else system python3)
+#
+# HORILLA_RUN_SCHEDULERS must be set HERE and only here — never in .env
+# (settings exports .env into os.environ; the argv gate makes that harmless,
+# but keep the config in one place).
+
+[Unit]
+Description=Horilla background job scheduler (APScheduler)
+After=network.target postgresql.service
+
+[Service]
+User=<app_user>
+WorkingDirectory=<app_dir>
+Environment=HORILLA_RUN_SCHEDULERS=1
+ExecStart=<python> manage.py run_schedulers
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

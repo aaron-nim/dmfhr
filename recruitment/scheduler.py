@@ -1,14 +1,16 @@
 import calendar
 import datetime as dt
-import sys
 from datetime import datetime, timedelta
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from dateutil.relativedelta import relativedelta
 
+from horilla.scheduler_utils import close_db_connections, schedulers_enabled
+
 today = datetime.now()
 
 
+@close_db_connections
 def recruitment_close():
     """
     Closes recruitment campaigns that have reached their end date.
@@ -28,6 +30,7 @@ def recruitment_close():
                 rec.save()
 
 
+@close_db_connections
 def candidate_convert():
     """
     Converts candidates to a "converted" state if they already exist as users.
@@ -47,10 +50,7 @@ def candidate_convert():
             cand.save()
 
 
-if not any(
-    cmd in sys.argv
-    for cmd in ["makemigrations", "migrate", "compilemessages", "flush", "shell"]
-):
+if schedulers_enabled():
     """
     Initializes and starts background tasks using APScheduler when the server is running.
     """

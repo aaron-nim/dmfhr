@@ -1,11 +1,12 @@
 import calendar
-import sys
 from datetime import date, datetime, timedelta
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from django.urls import reverse
 
 from notifications.signals import notify
+
+from horilla.scheduler_utils import close_db_connections, schedulers_enabled
 
 
 def update_rotating_work_type_assign(rotating_work_type, new_date):
@@ -105,6 +106,7 @@ def work_type_rotate_every(rotating_work_type):
     return
 
 
+@close_db_connections
 def rotate_work_type():
     """
     This method will identify the based on condition to the rotating shift assign
@@ -215,6 +217,7 @@ def shift_rotate_every(rotating_shift, today):
     return
 
 
+@close_db_connections
 def rotate_shift():
     """
     This method will identify the based on condition to the rotating shift assign
@@ -250,6 +253,7 @@ def rotate_shift():
     return
 
 
+@close_db_connections
 def switch_shift():
     """
     This method change employees shift information regards to the shift request
@@ -289,6 +293,7 @@ def switch_shift():
     return
 
 
+@close_db_connections
 def undo_shift():
     """
     This method undo previous employees shift information regards to the shift request
@@ -331,6 +336,7 @@ def undo_shift():
     return
 
 
+@close_db_connections
 def switch_work_type():
     """
     This method change employees work type information regards to the work type request
@@ -371,6 +377,7 @@ def switch_work_type():
     return
 
 
+@close_db_connections
 def undo_work_type():
     """
     This method undo previous employees work type information regards to the work type request
@@ -413,6 +420,7 @@ def undo_work_type():
     return
 
 
+@close_db_connections
 def recurring_holiday():
     from .models import Holidays
 
@@ -435,10 +443,7 @@ def recurring_holiday():
         recurring_holiday.save()
 
 
-if not any(
-    cmd in sys.argv
-    for cmd in ["makemigrations", "migrate", "compilemessages", "flush", "shell"]
-):
+if schedulers_enabled():
     scheduler = BackgroundScheduler()
 
     # Add jobs with next_run_time set to the end of the previous job

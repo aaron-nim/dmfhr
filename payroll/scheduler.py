@@ -5,18 +5,19 @@ This module is used to register scheduled tasks
 """
 
 import json
-import sys
 from datetime import date, timedelta
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from dateutil.relativedelta import relativedelta
 
+from horilla.scheduler_utils import close_db_connections, schedulers_enabled
 from payroll.methods.methods import calculate_employer_contribution, save_payslip
 from payroll.views.component_views import payroll_calculation
 
 from .models.models import Contract, Payslip
 
 
+@close_db_connections
 def expire_contract():
     """
     Finds all active contracts whose end date is earlier than the current date
@@ -93,6 +94,7 @@ def is_last_day_of_month(date):
     return next_day.month != date.month
 
 
+@close_db_connections
 def auto_payslip_generate():
     """
     Generating payslips for active contract employees
@@ -138,10 +140,7 @@ def auto_payslip_generate():
                 generate_payslip(date=date.today(), companies=companies, all=False)
 
 
-if not any(
-    cmd in sys.argv
-    for cmd in ["makemigrations", "migrate", "compilemessages", "flush", "shell"]
-):
+if schedulers_enabled():
     scheduler = BackgroundScheduler()
     scheduler.add_job(expire_contract, "interval", hours=4)
     scheduler.add_job(auto_payslip_generate, "interval", hours=3)

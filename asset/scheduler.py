@@ -4,7 +4,6 @@ scheduler.py
 This module is used to register scheduled tasks
 """
 
-import sys
 from datetime import date, timedelta
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -12,7 +11,10 @@ from django.urls import reverse
 
 from notifications.signals import notify
 
+from horilla.scheduler_utils import close_db_connections, schedulers_enabled
 
+
+@close_db_connections
 def notify_expiring_assets():
     """
     Finds all Expiring Assets and send a notification on the notify_before date.
@@ -54,6 +56,7 @@ def notify_expiring_assets():
                 )
 
 
+@close_db_connections
 def notify_expiring_documents():
     """
     Finds all Expiring Documents and send a notification on the notify_before date.
@@ -92,10 +95,7 @@ def notify_expiring_documents():
                 document.is_active = False
 
 
-if not any(
-    cmd in sys.argv
-    for cmd in ["makemigrations", "migrate", "compilemessages", "flush", "shell"]
-):
+if schedulers_enabled():
     scheduler = BackgroundScheduler()
     scheduler.add_job(notify_expiring_assets, "interval", days=1)
     scheduler.add_job(notify_expiring_documents, "interval", hours=4)

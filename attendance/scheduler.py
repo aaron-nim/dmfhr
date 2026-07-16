@@ -1,13 +1,14 @@
 import datetime
-import sys
 
 import pytz
 from apscheduler.schedulers.background import BackgroundScheduler
 from django.conf import settings
 
 from base.backends import logger
+from horilla.scheduler_utils import close_db_connections, schedulers_enabled
 
 
+@close_db_connections
 def create_work_record():
     from attendance.models import WorkRecords
     from employee.models import Employee
@@ -47,10 +48,7 @@ def create_work_record():
         print(f"No new work records to create for {date}.")
 
 
-if not any(
-    cmd in sys.argv
-    for cmd in ["makemigrations", "migrate", "compilemessages", "flush", "shell"]
-):
+if schedulers_enabled():
     """
     Initializes and starts background tasks using APScheduler when the server is running.
     """
