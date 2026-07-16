@@ -30,6 +30,7 @@ After=network.target postgresql.service
 User=<app_user>
 WorkingDirectory=<app_dir>
 Environment=HORILLA_RUN_SCHEDULERS=1
+Environment=PYTHONUNBUFFERED=1
 ExecStart=<python> manage.py run_schedulers
 Restart=always
 RestartSec=5
