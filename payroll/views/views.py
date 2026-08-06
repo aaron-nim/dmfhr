@@ -63,6 +63,8 @@ from payroll.models.models import (
 from payroll.models.tax_models import PayrollSettings
 
 # Create your views here.
+def payroll_approval(request):
+    return render(request, "payroll/payroll_approval.html")
 
 status_choices = {
     "draft": _("Draft"),
