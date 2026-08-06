@@ -10,6 +10,11 @@ from payroll.models.models import Contract, Payslip
 from payroll.views import views
 
 urlpatterns = [
+    path(
+        "payroll-approval/",
+        views.payroll_approval,
+        name="payroll-approval",
+    ),
     path("", include("payroll.urls.component_urls")),
     path("", include("payroll.urls.tax_urls")),
     path("get-language-code/", views.get_language_code, name="get-language-code"),
