@@ -15,7 +15,11 @@
     const iframe = document.getElementById("wise-payroll-iframe");
 
     iframe.addEventListener("load", async () => {
+        console.log("IFRAME LOADED");
+
         try {
+            console.log("REQUESTING IFRAME TOKEN");
+
             const response = await fetch("/api/auth/iframe-token/", {
                 method: "POST",
                 credentials: "include",
@@ -26,13 +30,11 @@
                 },
             });
 
-            if (!response.ok) {
-                throw new Error(
-                    `Failed to get iframe token: ${response.status}`
-                );
-            }
+            console.log("TOKEN RESPONSE STATUS:", response.status);
 
             const data = await response.json();
+
+            console.log("TOKEN RESPONSE:", data);
 
             iframe.contentWindow.postMessage(
                 {
@@ -41,8 +43,10 @@
                 },
                 "http://localhost:5173"
             );
+
+            console.log("TOKEN SENT TO IFRAME");
         } catch (error) {
-            console.error("Iframe authentication failed:", error);
+            console.error("IFRAME AUTH ERROR:", error);
         }
     });
 </script>
