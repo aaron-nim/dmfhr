@@ -4,6 +4,9 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from rest_framework.authentication import SessionAuthentication
+from rest_framework.permissions import IsAuthenticated
+
 from horilla_api.docs import document_api
 
 from ...api_serializers.auth.serializers import (
@@ -90,3 +93,19 @@ class LoginAPIView(APIView):
                 return Response({"error": "Invalid credentials"}, status=401)
         else:
             return Response({"error": "Please provide Username and Password"})
+
+
+class IframeTokenAPIView(APIView):
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        refresh = RefreshToken.for_user(request.user)
+        access = refresh.access_token
+
+        access["aud"] = "horilla-wise-iframe"
+
+        return Response({
+            "access": str(access),
+            "expires_in": 300,
+        })
