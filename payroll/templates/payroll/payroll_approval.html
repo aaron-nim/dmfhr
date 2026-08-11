@@ -3,10 +3,47 @@
 {% block content %}
 <div style="height: calc(100vh - 80px);">
     <iframe
+        id="wise-payroll-iframe"
         src="http://localhost:5173"
         width="100%"
         height="100%"
         frameborder="0">
     </iframe>
 </div>
+
+<script>
+    const iframe = document.getElementById("wise-payroll-iframe");
+
+    iframe.addEventListener("load", async () => {
+        try {
+            const response = await fetch("/api/auth/iframe-token/", {
+                method: "POST",
+                credentials: "include",
+                headers: {
+                    "X-CSRFToken": document.querySelector(
+                        "[name=csrfmiddlewaretoken]"
+                    )?.value || "",
+                },
+            });
+
+            if (!response.ok) {
+                throw new Error(
+                    `Failed to get iframe token: ${response.status}`
+                );
+            }
+
+            const data = await response.json();
+
+            iframe.contentWindow.postMessage(
+                {
+                    type: "HORILLA_IFRAME_AUTH",
+                    token: data.access,
+                },
+                "http://localhost:5173"
+            );
+        } catch (error) {
+            console.error("Iframe authentication failed:", error);
+        }
+    });
+</script>
 {% endblock %}
