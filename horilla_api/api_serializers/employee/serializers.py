@@ -22,13 +22,25 @@ class ActiontypeSerializer(serializers.ModelSerializer):
 
 class EmployeeListSerializer(serializers.ModelSerializer):
     job_position_name = serializers.CharField(
-        source="employee_work_info.job_position_id.job_position", read_only=True
+        source="employee_work_info.job_position_id.job_position",
+        read_only=True,
     )
+
     employee_work_info_id = serializers.CharField(
-        source="employee_work_info.id", read_only=True
+        source="employee_work_info.id",
+        read_only=True,
     )
+
     employee_bank_details_id = serializers.CharField(
-        source="employee_bank_details.id", read_only=True
+        source="employee_bank_details.id",
+        read_only=True,
+    )
+
+    basic_salary = serializers.DecimalField(
+        source="employee_work_info.basic_salary",
+        max_digits=12,
+        decimal_places=2,
+        read_only=True,
     )
 
     class Meta:
@@ -42,6 +54,7 @@ class EmployeeListSerializer(serializers.ModelSerializer):
             "employee_work_info_id",
             "employee_profile",
             "employee_bank_details_id",
+            "basic_salary",
         ]
 
 
