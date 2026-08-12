@@ -185,47 +185,47 @@ class EmployeeAPIView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_204_NO_CONTENT)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-
-class EmployeeListAPIView(APIView):
+ class EmployeeListAPIView(APIView):
     """
-    Retrieves a paginated list of employees with optional search functionality.
+    Retrieves a paginated list of employees belonging to the
+    authenticated user's company, with optional search functionality.
     """
 
     permission_classes = [IsAuthenticated]
 
- def get(self, request):
-    user = request.user
-    search = request.query_params.get("search")
+    def get(self, request):
+        user = request.user
+        search = request.query_params.get("search")
 
-    try:
-        user_employee = user.employee_get
-        company = user_employee.get_company()
-    except Exception:
-        return Response(
-            {"error": "Unable to determine user's company"},
-            status=status.HTTP_400_BAD_REQUEST,
+        try:
+            user_employee = user.employee_get
+            company = user_employee.get_company()
+        except Exception:
+            return Response(
+                {"error": "Unable to determine user's company"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        employees_queryset = Employee.objects.filter(
+            employee_work_info__company_id=company.id
+        ).only(
+            "id",
+            "employee_first_name",
+            "employee_last_name",
         )
 
-    employees_queryset = Employee.objects.filter(
-        employee_work_info__company_id=company.id
-    ).only(
-        "id",
-        "employee_first_name",
-        "employee_last_name",
-    )
+        if search:
+            employees_queryset = employees_queryset.filter(
+                Q(employee_first_name__icontains=search)
+                | Q(employee_last_name__icontains=search)
+            )
 
-    if search:
-        employees_queryset = employees_queryset.filter(
-            Q(employee_first_name__icontains=search)
-            | Q(employee_last_name__icontains=search)
-        )
+        paginator = PageNumberPagination()
+        page = paginator.paginate_queryset(employees_queryset, request)
 
-    paginator = PageNumberPagination()
-    page = paginator.paginate_queryset(employees_queryset, request)
+        serializer = EmployeeListSerializer(page, many=True)
 
-    serializer = EmployeeListSerializer(page, many=True)
-
-    return paginator.get_paginated_response(serializer.data)
+        return paginator.get_paginated_response(serializer.data)
 
 
 class EmployeeBankDetailsAPIView(APIView):
