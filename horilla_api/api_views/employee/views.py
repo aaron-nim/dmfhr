@@ -185,7 +185,7 @@ class EmployeeAPIView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_204_NO_CONTENT)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
- class EmployeeListAPIView(APIView):
+class EmployeeListAPIView(APIView):
     """
     Retrieves a paginated list of employees belonging to the
     authenticated user's company, with optional search functionality.
