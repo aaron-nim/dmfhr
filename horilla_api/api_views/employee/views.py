@@ -193,40 +193,39 @@ class EmployeeListAPIView(APIView):
 
     permission_classes = [IsAuthenticated]
 
-    def get(self, request):
-        user = request.user
-        search = request.query_params.get("search")
+ def get(self, request):
+    user = request.user
+    search = request.query_params.get("search")
 
-        # Start with a base queryset with only required fields
-        employees_queryset = Employee.objects.only(
-            "id", "employee_first_name", "employee_last_name"
+    try:
+        user_employee = user.employee_get
+        company = user_employee.get_company()
+    except Exception:
+        return Response(
+            {"error": "Unable to determine user's company"},
+            status=status.HTTP_400_BAD_REQUEST,
         )
 
-        # Permission-based filtering
-        if user.has_perm("employee.view_employee"):
-            pass  # employees_queryset is already all employees
-        else:
-            subordinate_qs = user.employee_get.get_subordinate_employees()
-            if subordinate_qs.exists():
-                employees_queryset = subordinate_qs.only(
-                    "id", "employee_first_name", "employee_last_name"
-                )
-            else:
-                employees_queryset = employees_queryset.filter(id=user.employee_get.id)
+    employees_queryset = Employee.objects.filter(
+        employee_work_info__company_id=company.id
+    ).only(
+        "id",
+        "employee_first_name",
+        "employee_last_name",
+    )
 
-        # Apply search filter if provided
-        if search:
-            employees_queryset = employees_queryset.filter(
-                Q(employee_first_name__icontains=search)
-                | Q(employee_last_name__icontains=search)
-            )
+    if search:
+        employees_queryset = employees_queryset.filter(
+            Q(employee_first_name__icontains=search)
+            | Q(employee_last_name__icontains=search)
+        )
 
-        # Paginate
-        paginator = PageNumberPagination()
-        page = paginator.paginate_queryset(employees_queryset, request)
+    paginator = PageNumberPagination()
+    page = paginator.paginate_queryset(employees_queryset, request)
 
-        serializer = EmployeeListSerializer(page, many=True)
-        return paginator.get_paginated_response(serializer.data)
+    serializer = EmployeeListSerializer(page, many=True)
+
+    return paginator.get_paginated_response(serializer.data)
 
 
 class EmployeeBankDetailsAPIView(APIView):
