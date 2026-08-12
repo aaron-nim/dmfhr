@@ -107,5 +107,5 @@ class IframeTokenAPIView(APIView):
 
         return Response({
             "access": str(access),
-            "expires_in": 300,
+            "expires_in": 30 * 24 * 60 * 60,
         })
